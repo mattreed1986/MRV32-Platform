@@ -1,0 +1,39 @@
+HOW TO ADD USER PROGRAMS
+
+	It is possible to run other user programs on the platform, though there are a few steps involved. 
+	First, your third party program will need to be ported (to use MRV32's syscalls). This basically involves writing a support library to make the program's TTY and file I/O match the OS's syscalls.
+	Once your third party program is ported, you will need to compile and link it with a RISC-V toolchain (such as riscv-gnu-toolchain). This involves creating a linker script and a C runtime startup file. The compilation and linking process will produce an ELF (executable and linkable format) file. The ELF file can be converted to a binary file with the toolchain, which can then be converted to copy-and-paste Verilog memory initialization data to be pasted into the RISCVRAM.v file.
+	It is important to note a few points about compilation and linking. The linker file (which has the .ld extension,) defines the stack size, the bss size, and the starting memory address of the program. The starting memory address has to match where you put it in the Verilog file. The C runtime startup file sets the stack pointer and zeros the bss. It is important that the stack pointer be set high in (but still within) the user memory and that you know that it will not overlap with the user program's bss that is the last in the memory. This means that you have to have a rough idea of how deep your user program's function calls will go (to estimate stack usage) and where the bss of the last program ends.
+	Once you have compiled and linked your user program, it will be necessary to verify that the program and its bss will fit in memory. In RISC-V-gnu-toolchain, this is done by inspecting the ELF file with objdump -d -t. There, you will find the memory address of the "__bss_end," which marks the top of the memory that the program will be using. On the Basys 3, this soft-core has 128 KB (technically 131072) bytes of RAM, so it is important to monitor the memory usage of the user programs. The following diagram shows the hypothetical memory layout of the platform with user programs:
+	
+	MEMORY
+	-------------------------------------
+		-kernel
+		-------
+		-------
+		-kernel bss
+		-------
+		-------
+		-kernel stack
+		-------
+		-user program 1
+		-------
+		-------
+		-user program 1's bss
+		-------
+		-------
+		-user program 2
+		-------
+		-------
+		-user program 2's bss
+		-------
+		-------
+		-------
+		~~~~~~~
+		-------
+		-------
+		-user program stack top
+	-------------------------------------
+
+	After the program and its bss's size have been determined and it is verified that they won't overlap the stack, the boot portion of the kernel will need to be modified to include a directory entry for the new user program. One will find a succession of create_file() function calls near the bottom of boot.c. An additional call will need to be added for the new user program. In the function, the program's command name is specified as well as its starting memory address and how much memory it uses (including the program's instructions and bss.)
+	The kernel will need to be recompiled with a similar procedure to the program compilation (now that it will boot with the correct directory entries,) and will need to be pasted into the Verilog, as will the new user program, both using the compilation and Verilog generation process described above. Once this is done, the new bitstream can be generated for the Vivado project, the device can be programmed, and the new user program will be ready to run.

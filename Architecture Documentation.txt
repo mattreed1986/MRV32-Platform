@@ -1,0 +1,135 @@
+This document explains the platform’s hardware, software, and their inner workings.
+
+
+HARDWARE ARCHITECTURE
+
+	The MRV32 Platform hardware can be described as centrally controlled with a point-to-point (module to module) datapath. This means that most of the control signals proceed from the Control Module (CM) to the other individual modules. The rest of the control signals come from the Trap Unit (TU), which handles trap control signals, which involve the Program Counter (PC), the CSRs, and privilege level control.
+	Many of the wires between modules in the platform are named according to a convention where all-caps names represent datapath items and lower case names represent control signals. The control signals are usually acronyms that contain the letters of the names of the modules they are controlling. Most control signals starting with the letter s are "setting" control signals: they set something. For example, the signal "spm" would be used for setting the signal that goes from the PC to the MAR.
+	Many of The Platform's datapath signals are continuously exerted onto the receiving modules. When the appropriate time comes for the signal to be assigned in the receiving module, a setting control signal will usually be issued that causes the receiving module to accept the waiting data and do what it should with it.
+
+	
+CONTROL MODULE
+	
+	The Platform's Control Module utilizes a T counter to advance through the control signals that make up the instructions. It is incremented every clock cycle. At T = 0, all but the spm control signal are set to 0, starting the cycle of control signals that transfer the instruction from the RAM to the CM, known as the "fetch cycle." At the end of every instruction, the T counter is reset.
+	MRV32's fetch cycle involves the PC, Memory Address Register (MAR), RAM, Instruction Register (IR), and the CM. Before the official fetch cycle of an instruction, the PC is usually incremented. In the event that the PC is incremented, the purpose of doing so is to ensure that the next instruction will ultimately be fetched by the CM. Jumps and branches are exceptions; they do not increment PC at the end of the execution cycle. At T = 0, the CM issues an spm (set pc mar) signal to the MAR, which causes it to assign the value being asserted onto it by the PC to the "MAR" reg. The MAR -> RAM datapath is one example of data being asserted between modules that does not require a setting control signal to be received. It is "continuously assigned." At T = 2, sri (set ram ir) is issued to store the RAM's output in the IR. A T state is skipped because there are two nonblocking assignments that take place between T = 0 and T = 2. The first is the assignment of the MAR, and the second is the clocked RAM access.
+	 At T = 3, sri is deasserted, and T = 4 marks the beginning of the cycle which includes the control signals which are unique to each instruction, known as the "execution cycle." There is a separation to avoid race conditions that may corrupt the instruction once it has been uploaded by the CM. This hypothetically could happen by the RAM being changed at T = 4. The execution cycle is always concluded with a T <= 0 to reset the T counter.
+
+	 
+PROGRAM COUNTER
+
+	The Platform's PC is advanced with most instructions for the purpose of advancing to the next instruction of the program. This happens via the pc control signal. In instances where pc is not issued, the program counter still has to be set properly for the correct instruction to be sent to the CM. This happens in branch and jump instructions and in traps. 
+	The memory in RV32 is byte addressed. This means that for the PC to advance to the next instruction, it has to be incremented by the number of bytes in an instruction, and since there are 32 bits per instruction (4 bytes), it has to be incremented by 4.
+	
+	
+MEMORY ADDRESS REGISTER
+
+	The MAR's purpose is to point to the memory address that is being dealt with in the current instruction. The control signals going to the MAR are capable of shaping the MAR via data paths from the PC, registers (REGS), and the CM. The CM_MAR datapath is used to build RAM addresses from other datapaths combined with immediates. 
+	
+
+RANDOM ACCESS MEMORY
+
+	In the MRV32 Platform, the RAM is currently home to the memory for instructions as well as data. The Platform uses 32768 32-bit words of RAM. This allows for a small kernel/shell, some third party user programs, and some files. In the future, this may be expanded to microSD card memory for larger programs or more files.
+	All RAM access is clocked. This is for the purpose of utilizing the BRAM that comes with the Basys 3. Without clocking the RAM access, BRAM utilization in Vivado would be impossible.
+	As mentioned earlier, RV32's memory is byte addressed, in 32 bit words. Loads and stores of byte, half word, and word sizes are supported. 
+	For byte selection, the least significant two bits of what starts off as MAR_RAM are used. From that, the write enable bits are determined for stores, and the individual byte to be read is determined for instances of single byte reads.
+	For writing, the store data is broken up into either 4 similar bytes, 2 similar halves, or one word. The store data is then sent through a write enable mask that puts it in the correct byte, half, or word.
+	For reading, the whole word is read, and then the chosen byte(s) are extracted from it and processed for size and signedness.
+	
+	
+INSTRUCTION REGISTER
+
+	The Instruction Register gets the instruction from the RAM and holds it for the Control Module. In a more advanced system, it would serve the purpose of acting as a high-speed buffer for instructions on their way from the memory to the CM.
+	
+	
+GENERAL PURPOSE REGISTERS
+	
+	In a computer processor, it is necessary to have small pieces of memory for holding the data that it stores in RAM, loads from RAM, uses as targets for jumps, etc. These are called registers (REGS). An RV32 computer has 32 registers, each used for specific things according to the ABI. The registers are 32 bits wide, and register #0 (x0) is kept at 0. 
+	The vast majority of other modules in the platform are connected to the registers. These include the CM, PC, ALU, CSRs, RAM, MAR, and UART. That's because they are the go-to for temporarily holding and manipulating data. 
+	The REGS module in MRV32 is clocked and uses a write mux to select its source of writeback data. The control signal that is asserted serves as both the writeback enable and the controller for the mux.
+	
+
+CONTROL AND STATUS REGISTERS
+	
+	RISC-V reserves a special set of registers for keeping track of trap entry point, trap cause, scratch information, and other things. These are called CSRs (Control and Status Registers.) In MRV32, for saving resources, there is currently only one CSR: SEPC (Supervisor Exception Program Counter). It is responsible for keeping track of trap entry/exit points and launching user programs at their starting addresses.
+
+
+ARITHMETIC LOGIC UNIT
+	
+	In most processors, the Arithmetic Logic Unit (ALU) is where the math happens. Though it depends on the architecture, in MRV32, the ALU specifically handles arithmetic, bitwise operations, and inequalities (branching and otherwise.)
+	The MRV32 ALU gets its control signals in the form of opcodes. Each opcode is assigned a number, both in the CM and in the ALU. Those numbers are assigned to registers and used to control which operation is performed. Once set up, it makes it easy to see that the right control signal is being sent.
+	Thanks to a third party algorithm that was adapted for ALU use, MRV32 supports hardware division in its ALU.
+	
+	
+TRAP UNIT
+
+	The purpose of the Trap Unit (TU) in a RISC-V system is to manage the handling of syscalls and other interrupts. Syscalls and interrupts are special OS functions that are separate from the user program and are used for input, output, file opening and closing, starting and exiting user programs, etc. 
+	This functioning can vary according to the hardware, but in the MRV32 Platform it is relatively straightforward. There are three trap vectors: stvec, tx interrupt vector, and rx interrupt vector. When there is an ecall instruction issued, the PC goes straight to stvec. This is for syscalls. For example, if your user program were to want to put some text on the screen, it would load the "a" (syscall) registers up with the appropriate file descriptor, a pointer to the text, how many characters to print, and the syscall number for "sys_write" (which is the syscall for putting text on the screen in the platform), and then an ecall would be issued. The PC would jump straight to the hardcoded stvec, the return address would be stored in a CSR, and the kernel code for sys_write would be dispatched. Then, your text would appear on the screen. One special thing about sys_write is that it actually contains a tx interrupt internally, which means that inside of the execution of the kernel code, the tx interrupt vector is leapt to. The main difference between the tx interrupt and the initial syscall (in MRV32) is that the tx interrupt stores the return value in "ra" (a register reserved for return addresses) and not a CSR.
+	
+	
+UART
+
+	UART stands for "Universal Asynchronous Receiver/Transmitter."	It is the means for the computer to communicate with the outside world. It uses a set baud rate to send or receive a byte at a time over an rx wire and a tx wire. When a byte is being sent, the line goes low for one cycle, then transmits logic high for a 1 and logic low for a 0 at the baud rate until all the bits are sent. Then the stop bit is transmitted, completing the transmission. MRV32 uses UART for communication with a host computer. This eliminates the necessity of a separate keyboard and monitor. 
+	
+
+OS ARCHITECTURE
+
+	The MRV32 Platform's OS can be summed up as a syscall-based, Unix-like kernel that uses a file descriptor system and a flat directory structure. It weighs in at roughly 700 instructions, and can run ported, third-party programs that have been compiled with the RISC-V-gnu-toolchain, making it capable of running programs compiled from C, C++, or assembly. (As an added note, one of the user programs is a Tiny Basic interpreter, so the computer can also be programmed in Tiny Basic.) The following sections cover the OS in detail.
+
+
+BOOT
+
+	On booting up, the OS does five things: it clears the shell/kernel bss, initializes the file descriptor number pointers, sets the type of the first three file descriptors, creates the file directory with the starting user programs/files, and jumps to the shell. 
+	The bss clear is just the typical loop. It goes from memory address to memory address, setting them all to 0. 
+	Once the bss is cleared, each file descriptor number gets set to point to a corresponding fd_entry. The purpose of this is to ensure that the global_fd_table.numbers reference valid memory.
+	The next step, setting the file descriptor types, is what prepares the OS for standard input and output. Without this step, there would be nothing defining the behavior of writes and reads that would be intended to go to the TTY (teletypewriter).
+	Since this OS has such a simple directory structure and file handling system, it just stores each file's name, starting address, and size from the beginning in a directory table. This allows for executing and retrieving programs and files and creating new ones without clobbering existing ones.
+	Once all of this is finished, the CPU jumps to the shell for the input of commands. This is done by just calling the shell() function, concluding the boot sequence without returning.
+
+
+DIRECTORY STRUCTURE
+
+	The directory structure is a struct called directory_entry_t with attributes name[MAX_FILENAME], starting_addr, size, and used. There are MAX_FILENAME entries in the table, and the used attribute allows the OS to see which entries are in use for the purpose of turning an unused entry into a new file.
+
+	
+TRAP ENTRY/SYSCALL DISPATCH
+
+	When a syscall is issued, the first thing that happens is the context save. This occurs via the trap entry function. In this function, all of the registers are saved to the stack, and the context pointer is saved as a0, making it the argument for the next function, sys_dispatch.
+	Sys_dispatch is named after its function: it dispatches the syscalls. The original a0 from before calling sys_dispatch is restored via the context pointer (where all of the registers were saved). This way, it is ready for the particular syscall that will be issued. In the RISC-V ABI, register a7 is the syscall identifier, so it is assigned to a variable in sys_dispatch and a switch statement is used to direct the execution to the correct syscall.
+	When the syscall is complete, it generally returns a value. If there was a problem, the return value will be -1. The value is returned to the user program via a0, the PC gets incremented inside the memory that context* points to, and execution returns to the original trap entry function. Once back in trap entry, all of the registers are restored, as well as the stack pointer. Then sret is called and execution of the user program resumes.
+	
+	
+SHELL
+
+	The OS's shell prints a prompt via write syscall and takes input via read sys_calls. It includes support for backspace and delete. Once the input has been taken, the string is processed for the purpose of being passed to the execve syscall (which is responsible for launching user programs), which will either start the program or print "INVALID COMMAND." This works by execve returning 0 if it fails to open the program. 
+
+
+SYSCALLS AND FILE DESCRIPTORS
+
+	The Platform currently contains 6 syscalls: write, read, open (file), close (file), execve, and exit. These are sufficient for porting most text-based user programs that involve TTY (teletypewriter: text-based in and out usually seen in terminals) and file input and output. Other hardware manipulation may be added in the future.
+	Before the write, read, open, and close syscalls are discussed, it would be necessary to mention FDs (file descriptors) and how they work in a Unix-like system. You may be familiar with stdin, stdout, and stderr. Those are common file descriptors in Linux. The Platform OS uses a similar (and probably somewhat simplified) scheme. File descriptors exist for the purpose of writing and reading data to the terminal and files. It is a flexible system that organizes the handles for destinations ("file objects") and makes them accessible. This means that a user program can just use the file descriptor number in a syscall to read or write data to a particular destination. In other OSes, there are a lot of possible file object types, but here, there are only two, TTY and files. Since the platform is written in C, the "type" is an attribute of the "file_object" data type. In practice, the read or write syscall functions differently depending on the file object type. More on this later.	
+
+
+SYSWRITE AND SYSREAD
+
+	The sys_write syscall writes data to the TTY or a file. Its arguments include the following: target FD, a pointer to the buffer that is being written, and the number of bytes to be written. Its flow starts off with a check on the validity of the provided FD number. If the FD is less than 0, sys_write will return -1, which can be used to signal to a user program that there was an error. After this, the syscall branches into its handling of different file object types. 
+	For type "FT_FILE," the write process is fairly straightforward. A write_address pointer is set up and the starting address of the FD table number entry is assigned to the pointer. Then, the FD table number's position is used as an index for the write_address pointer, and the first element of the input buffer is written to that write address. The position is incremented, and the assignment of buffer to write address proceeds until the prescribed number of bytes is written.
+	The code that handles type "FT_TTY," written in assembly, sends characters to the UART until the number of bytes is written. The process works by storing the number of bytes to be written in RAM word address 1997. When the value at this address is nonzero, there is a TX interrupt, which fires initially when 1997 is set and subsequently when a UART transmission finishes, causing the PC to jump to the TX interrupt vector, which is set to the address of the instruction that stores the number of bytes in 1997. One might ask, "If the vector is set to the instruction that makes the CPU jump to the vector, then how does program proceed?" When 1997 is updated, it starts the transmission process FSM (Finite State Machine: the type of Verilog mechanism that allows sequential execution), which contains the directive to jump to the vector early on but cannot restart until the character's transmission is finished. At the end of the TTY write, the PC gets set to the TX interrupt vector, and 0 gets assigned to 1997. The program's flow is diverted away from the transmission loop and it jumps to the return address.
+	Sys_read is similar to sys_write. It starts with the FD < 0 check, and then it either reads from the TTY or a file. Its arguments include FD, buffer to be read from, byte count, and the raw flag. The raw flag is used to choose either raw or canonical mode for TTY reads. More on this later.
+	When reading from a file, the process is similar to writing a file. A read address pointer is set up, initialized to the starting address of the FD number entry. Then, position indexed read address is assigned to the buffer. The number of bytes read is returned.
+	The TTY read handler is a little different, but like the TTY write handler, it sits on a wfi instruction for a portion of its cycle and relies upon an interrupt vector. It works by sitting on a wfi (wait for interrupt) until an RX interrupt comes, then jumping to the RX interrupt vector when a key is pressed.
+	In Unix-like TTY reads, there is more than one mode of text processing. These modes are known as canonical and raw mode. Canonical mode is the type of processing that accepts characters either until enter is pressed or until the buffer has reached its limit. One example of canonical mode would be the terminal. Raw mode accepts one character at a time. This is similar to pressing enter after every character. Text editors use raw mode. The raw flag determines raw/canonical behavior.
+	
+
+SYSOPEN AND SYSCLOSE
+
+	Sys_open is the means for opening existing files and creating new ones. Its arguments are *filename, append, and create. As the arguments suggest, it opens a file with the name that is pointed to by *filename for either writing new or appending and either creating a new file or opening an existing one. If there is an attempt to open a file that does not exist and the create flag is not on, the syscall will return -1.
+	The flow for sys_open starts by determining whether there is an existing file with the filename. If the file does not exist, then it will be created if the create flag is on, or the syscall will return -1. The directory search that determined whether the file exists will return an existing file's directory index or -1 for a filename that does not represent an existing file. If the file did not exist, the next open directory index will be assigned to it, and it will be created if the create flag equals 1.
+	After the file exists and has a directory index, the next open FD is allocated to the file. If there is an error in the FD allocation, the syscall will return -1.
+	Once the FD is created, the fd table attributes are set. If append equals 1, then the file FD table number's position is assigned the size attribute of the directory table entry; if it equals 0, the position is set to 0. The type attribute is set to FT_FILE, and the FD table number entry is set to the address of the directory table entry. The newly created FD number is returned by the syscall.
+	Sys_close's purpose is to end the user program's interaction with the file. It does this by setting the size of the FD table number entry, which also changes its size in the directory table. It also sets the FD's type to FT_NONE. When successfully completed, it returns 0.
+
+	
+SYSEXECVE AND SYSEXIT
+	
+	Sys_execve is used for starting user programs. It is called from the shell. It starts with an argv parsing function that turns the input from the shell into an array that is pointed to. Since the first argument is the name of user program, it is passed into a function that searches the directory table for a program with the name that matches. A directory table index is returned, and the associated starting memory address is put into the sepc. Execve is special among the platform's syscalls because it does not return to where it was called from, and it passes argc and argv into the user program.
+	Sys_exit is very simple. Its purpose is to stop the execution of the user program and return to the shell. It loads sepc with the address of the beginning of the shell function, clears all of the registers, and issues sret, which launches the shell.
