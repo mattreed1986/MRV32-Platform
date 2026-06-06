@@ -1,13 +1,14 @@
-module CM(clk, rst, tu, restu, ecall, sret, mret, rxinterrupt, tx_int_ack, pc, bacm, stucsrpc, pcpi, ipc, mpi, rpi, scmcsi, scmcst, scmpc, jalr, cur, smi, spm, srm, crm, sri, spcr, spcrt, srpc, spca, sraa, srab, sar, scmr, srcm, srram, srr8, srr16, srr32, sramrs8, sramrs16, sramrs32, sramru8, sramru16, scsr, srcs, spcs, scsp, scmcs, csbmr, csbmi, csor, csan, smrar, scma, scmau, stupc, ALU_OP, CM_PC, IR_CM, REGS_CM, CM_REGS, REG_A, REG_B, REG_D, CM_ALU, ALU_CM, CM_CSR, CM_CSRI, CM_CSRT, CM_MAR);
+module CM(clk, rst, tu, restu, ecall, sret, mret, rxinterrupt, tx_int_ack, pc, bacm, stucsrpc, pcpi, ipc, mpi, rpi, scmcsi, scmcst, scmpc, jalr, cur, smi, spm, srm, crm, sri, spcr, spcrt, srpc, spca, sraa, srab, sar, scmr, srcm, srram, srr8, srr16, srr32, sramrs8, sramrs16, sramrs32, sramru8, sramru16, scsr, srcs, spcs, scsp, scmcs, csbmr, csbmi, csor, csori, csan, csrl, csani, smrar, scma, scmau, stupc, ALU_OP, CM_PC, IR_CM, REGS_CM, CM_REGS, REG_A, REG_B, REG_D, CM_ALU, ALU_CM, CM_CSR, CM_CSRI, CM_CSRT, CM_MAR);
 
 input clk, rst, bacm, stucsrpc, stupc, rxinterrupt, tx_int_ack;
 input[31:0] IR_CM, REGS_CM, ALU_CM;
-output reg[31:0] CM_REGS, CM_CSR, CM_CSRI, CM_CSRT;
+output reg[31:0] CM_REGS, CM_CSRI, CM_CSRT;
+output reg[11:0] CM_CSR;
 output reg[19:0] CM_PC;
 output reg[31:0] CM_MAR;
 output reg[31:0] CM_ALU;
 output reg[4:0] REG_A, REG_B, REG_D, ALU_OP;
-output reg tu, restu, ecall, sret, mret, pc, pcpi, mpi, rpi, ipc, scmcsi, scmcst, scmpc, jalr, cur, smi, spm, srm, crm, sri, spcr, spcrt, srpc, spca, sraa, srab, sar, scmr, srcm, srram, srr8, srr16, srr32, sramrs8, sramrs16, sramrs32, sramru8, sramru16, scsr, srcs, spcs, scsp, scmcs, csbmr, csbmi, csor, csan, smrar, scma, scmau;
+output reg tu, restu, ecall, sret, mret, pc, pcpi, mpi, rpi, ipc, scmcsi, scmcst, scmpc, jalr, cur, smi, spm, srm, crm, sri, spcr, spcrt, srpc, spca, sraa, srab, sar, scmr, srcm, srram, srr8, srr16, srr32, sramrs8, sramrs16, sramrs32, sramru8, sramru16, scsr, srcs, spcs, scsp, scmcs, csbmr, csbmi, csor, csori, csan, csrl, csani, smrar, scma, scmau;
 wire[31:0] instruction;
 reg[5:0] T;
 reg[16:0] scounter;
@@ -102,6 +103,7 @@ begin
 	csbmi	= 0;
 	csor	= 0;
 	csan	= 0;
+	csrl	= 0;
 	smrar	= 0;
 	scma	= 0;
 	scmau	= 0;
@@ -183,6 +185,7 @@ begin
 		csbmi	<= 0;
 		csor	<= 0;
 		csan	<= 0;
+		csrl	<= 0;
 		smrar	<= 0;
 		scma	<= 0;
 		scmau	<= 0;
@@ -1162,24 +1165,33 @@ begin
 			if (instruction[14:12] == 3'b001)
 			begin
 			
-				REG_D <= instruction[11:7];		
-				REG_A <= instruction[19:15];
-				scsr <= 0;
-				srcs <= 0;
-				pc <= 0;
+				REG_D 	<= instruction[11:7];		
+				REG_A 	<= instruction[19:15];
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				scsr 	<= 0;
+				srcs 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;
 				
 				if (T == 4)
+				begin
+					scmcs <= 1;
+				end
+				
+				if (T == 5)
 				begin
 					scsr <= 1;
 				end
 					
-				if (T == 5)
+				if (T == 6)
 				begin
 					srcs <= 1;
 				end
 					
-				if (T >= 6)
+				if (T >= 7)
 				begin
+					csrl <= 1;
 					pc <= 1;
 					T <= 0;
 				end
@@ -1189,25 +1201,35 @@ begin
 			if (instruction[14:12] == 3'b010)
 			begin
 			
-				REG_D <= instruction[11:7];		
-				REG_A <= instruction[19:15];
-				CM_CSR <= instruction[31:20];
+				REG_D 	<= instruction[11:7];		
+				REG_A 	<= instruction[19:15];
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				csbmr 	<= 0;
+				scsr 	<= 0;
+				csor 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;				
 			
 				if (T == 4)
 				begin
 					scmcs <= 1;
+				end				
+			
+				if (T == 5)
+				begin
 					csbmr <= 1;
 					scsr <= 1;
 				end
 				
-				if (T == 5)
+				if (T == 6)
 				begin
-					scsr <= 0;
 					csor <= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
+					csrl <= 1;
 					T <= 0;
 					pc <= 1;
 				end
@@ -1217,25 +1239,35 @@ begin
 			if (instruction[14:12] == 3'b011)
 			begin
 
-				REG_D <= instruction[11:7];		
-				REG_A <= instruction[19:15];
-				CM_CSR <= instruction[31:20];
-	
+				REG_D 	<= instruction[11:7];		
+				REG_A 	<= instruction[19:15];
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				scsr 	<= 0;
+				csbmr 	<= 0;
+				csan 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;				
+				
 				if (T == 4)
 				begin
 					scmcs <= 1;
+	            		end				
+				
+				if (T == 5)
+				begin
 					scsr <= 1;
 					csbmr <= 1;
 	            		end
 	            
-				if (T == 5)
+				if (T == 6)
 				begin
-					scsr <= 0;
 					csan <= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
+					csrl <= 1;
 					T <= 0;
 					pc <= 1;
 				end
@@ -1245,24 +1277,33 @@ begin
 			if (instruction[14:12] == 3'b101)
 			begin
 			
-				REG_D <= instruction[11:7];		
+				REG_D 	<= instruction[11:7];		
 				CM_CSRI <= { 27'b0 , instruction[19:15] };
-				CM_CSR <= instruction[31:20];
-	
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				scsr 	<= 0;
+				scmcsi 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;
+						
 				if (T == 4)
 				begin
 					scmcs <= 1;
+				end	
+						
+				if (T == 5)
+				begin
 					scsr <= 1;
 				end
 				
-				if (T == 5)
+				if (T == 6)
 				begin
-					scsr <= 0;
 					scmcsi <= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
+					csrl <= 1;
 					pc <= 1;
 					T <= 0;
 				end
@@ -1273,25 +1314,34 @@ begin
 			if (instruction[14:12] == 3'b110)
 			begin
 	
-				REG_D <= instruction[11:7];		
+				REG_D 	<= instruction[11:7];		
 				CM_CSRI <= { 27'b0 , instruction[19:15] };
-				CM_CSR <= instruction[31:20];
-
-	
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				csbmi 	<= 0;
+				scsr 	<= 0;
+				csori 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;
+				
 				if (T == 4)
 				begin
 					scmcs <= 1;
+				end
+
+				if (T == 5)
+				begin
 					csbmi <= 1;
 				end
 				
-				if (T == 5)
+				if (T == 6)
 				begin
-					scsr <= 0;
-					csor <= 1;
+					csori <= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
+					csrl <= 1;
 					pc <= 1;
 					T <= 0;
 				end
@@ -1301,9 +1351,16 @@ begin
 			if (instruction[14:12] == 3'b111)
 			begin
 			
-				REG_D <= instruction[11:7];	
+				REG_D 	<= instruction[11:7];	
 				CM_CSRI <= { 27'b0 , instruction[19:15] };
-				CM_CSR <= instruction[31:20];
+				CM_CSR 	<= instruction[31:20];
+				scmcs 	<= 0;
+				csbmi 	<= 0;
+				scsr 	<= 0;
+				scsr 	<= 0;
+				csani 	<= 0;
+				csrl	<= 0;
+				pc 	<= 0;
 	
 				if (T == 4)
 				begin
@@ -1315,11 +1372,12 @@ begin
 				if (T == 5)
 				begin
 					scsr <= 0;
-					csan <= 1;
+					csani <= 1;
 				end
 	
 				if (T >= 6)
 				begin
+					csrl <= 1;
 					pc <= 1;
 					T <= 0;
 				end
@@ -1332,16 +1390,20 @@ begin
 			//ecall
 			if (instruction[31:15] == 17'b0)
 			begin
-				sup <= 0;
 				ecall <= 0;
+				restu <= 0;
 		
 				if (T == 4)
 				begin
-					sup <= 1;
 					ecall <= 1;
                 		end
+                		
+                		/*if (T == 5)
+                		begin
+                			restu <= 1;
+                		end*/
 					
-				if (T == 5)
+				if (T >= 8)
 				begin
 					T <= 0;	
 				end					
@@ -1350,23 +1412,21 @@ begin
 			//sret
 			if (instruction[31:20] == 12'b000100000010)
 			begin
+				sret <= 0;
+				restu <= 0;
+				
 				if (T == 4)
 				begin
-					ecall <= 0;
 					sret <= 1;
 				end
 				
 				if (T == 5)
 				begin
-					tu <= 1;
-					sret <= 0;
-					sup <= 0;
+				    	restu <= 1;
 				end
 				
 				if (T == 6)
 				begin
-				    tu <= 0;
-				    restu <= 1;
 					T <= 0;
 				end
 			end
@@ -1374,24 +1434,22 @@ begin
 			//mret
 			if (instruction[31:20] == 12'b001100000010)
 			begin
-				if (T == 6)
+				mret <= 0;
+				restu <= 0;
+				
+				if (T == 4)
 				begin
-					ecall <= 0;
 					mret <= 1;
 				end
 				
-				if (T == 7)
+				if (T == 5)
 				begin
-					tu <= 1;
-					sup <= 0;
+				    	restu <= 1;
 				end
 				
-				if (T == 8)
+				if (T == 6)
 				begin
-				    tu <= 0;
-				    restu <= 1;
 					T <= 0;
-					pc <= 1;
 				end
 			end
 		
@@ -1416,7 +1474,7 @@ begin
 				sri <= 0;
 				srm <= 0;
 				mpi <= 0;
-				sramrs32 <= 0;
+				sramrs8 <= 0;
 				crm <= 0;
 				pc <= 0;
 				rpi <= 0;
