@@ -93,7 +93,7 @@
  * 		Added LOCK to lock range of line numbers to prevent editing of program.
  * 		Added UNLOCK to remove editing lock.
  * 		Added ShowProgramLockState() to report program editing lock state.
- * 		Added REBOOT command to force a soft reboot of the system.  This does NOT
+ * 		Added EXIT command to force a soft EXIT of the system.  This does NOT
  * 			perform a hardware reset; it only restarts the interpreter and calls
  * 			the target t_ColdBoot() and t_WarmBoot() functions.  (CHANGED!  See below.)
  * 		Sorry, What?, and How? messages now show offending line number.
@@ -111,8 +111,8 @@
  * 		Added FLSAVE keyword; invokes t_ForceWriteToFlash (if supported) to write RAM
  * 			buffer to flash.  This is an alternate method to force a flash save without
  * 			using BYE.
- * 		Changed functionality of REBOOT command.  It now forces a hardware reset by
- * 			calling the target's t_ForceHWReset() function.  REBOOT cannot be used
+ * 		Changed functionality of EXIT command.  It now forces a hardware reset by
+ * 			calling the target's t_ForceHWReset() function.  EXIT cannot be used
  * 			inside a program.
  * 
  * v0.02:  11 Jul 2023  KEL
@@ -401,7 +401,7 @@ static unsigned char		*list_line;
 static unsigned char		*tmptxtpos;
 static unsigned char 		expression_error;
 static unsigned char 		*tempsp;
-static unsigned char		forcereboot;			// TRUE forces a soft reboot after REBOOT command
+static unsigned char		forceEXIT;			// TRUE forces a soft EXIT after EXIT command
 static char					tempfilename[MAX_LEN_FILENAME+1];
 
 
@@ -472,7 +472,7 @@ const static unsigned char		keywords[] =
 	"LOCK? "				// report the lock state of the program
 	"LOCK "					// lock all or part of current program to prevent editing
 	"UNLOCK "				// unlock all of current program to allow editing
-	"REBOOT "				// performs a hardware reset of the system
+	"EXIT "				// performs a hardware reset of the system
 	"OUTCHAR "				// outputs a value as an ASCII char
 	"BEEP "					// fixed freq and duration beep, blocks until tone ends
 	"TEST "					// triggers a target-specific test, if available
@@ -517,7 +517,7 @@ enum {
   KW_LOCKQ,
   KW_LOCK,
   KW_UNLOCK,
-  KW_REBOOT,
+  KW_EXIT,
   KW_OUTCHAR,
   KW_BEEP,
   KW_TEST,
@@ -2286,14 +2286,14 @@ interperateAtTxtpos:
 				goto execnextline;
 			}
 		}
-		forcereboot = FALSE;
+		forceEXIT = FALSE;
 		return;
 
 		
-		case KW_REBOOT:	// leave the basic interpreter and force hardware reset afterwards
+		case KW_EXIT:	// leave the basic interpreter and force hardware reset afterwards
 		if (current_line > 0)			// do not allow reset from inside a program!
 		{
-			printstr("\nCannot force a reboot from inside a program!\n");
+			printstr("\nCannot force a EXIT from inside a program!\n");
 			goto qsorry;
 		}
 		if (program_start != program_end)			// if program in memory...
@@ -2305,7 +2305,7 @@ interperateAtTxtpos:
 				goto execnextline;
 			}
 		}
-		forcereboot = TRUE;
+		forceEXIT = TRUE;
 		return;
 
 	
@@ -3485,7 +3485,7 @@ int main( int argc, char ** argv )
 {
 	do
 	{
-		forcereboot = FALSE;
+		forceEXIT = FALSE;
 		t_ColdBoot();
 		
 		//srand(1234567);
@@ -3502,9 +3502,9 @@ int main( int argc, char ** argv )
     
 /*
  * We reach this point on leaving the interpreter loop, usually because the user entered
- * the 'BYE' (forcereboot = FALSE) or 'REBOOT' (forcereboot = TRUE) commands.
+ * the 'BYE' (forceEXIT = FALSE) or 'EXIT' (forceEXIT = TRUE) commands.
  */
-		if (forcereboot)
+		if (forceEXIT)
 		{
 			t_Shutdown();			// perform whatever tasks the target must do to shutdown
 		}
