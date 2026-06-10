@@ -12,7 +12,7 @@ output reg tu, restu, ecall, sret, mret, pc, pcpi, mpi, rpi, ipc, scmcsi, scmcst
 wire[31:0] instruction;
 reg[5:0] T;
 reg[16:0] scounter;
-reg wfi, resT, sup;
+reg wfi, resT, sup, pf, ri;
 localparam [4:0]
     add  = 5'd1,
     mul  = 5'd2,
@@ -62,6 +62,8 @@ begin
     	ALU_OP  = 0;
 	sret	= 0;
 	mret	= 0;
+	ri	= 0;
+	pf	= 0;
 	tu	= 0;	
 	restu    = 0;
 	pc 	= 0;
@@ -130,7 +132,7 @@ end
 else if (!wfi)
 begin
     	T <= T + 1;
-	if (T == 0)
+	if (T == 0 || ri)
 	begin
 		REG_A	<= 0;	
 		REG_B	<= 0;
@@ -145,6 +147,7 @@ begin
 		ALU_OP  <= 0;
 		sret	<= 0;
 		mret	<= 0;
+		ri	<= 0;
 		tu	<= 0;	
 		restu   <= 0;
 		pc 	<= 0;
@@ -154,7 +157,8 @@ begin
 		jalr	<= 0;
 		cur 	<= 0;
 		smi	<= 0;
-		spm	<= 1;
+		if (!ri)
+			spm	<= 1;
 		srm	<= 0;	
 		crm 	<= 0;
 		ipc	<= 0;
@@ -204,30 +208,41 @@ begin
 	else if (T >= 3)
 	begin
 		sri 	<= 0;
-		if (instruction[6:0] == 7'b0000000)
-			if (T >= 4)
+		if (!((instruction[6:0] == 7'b0010111) || (instruction[6:0] == 7'b1110011) || (instruction[6:0] == 7'b0000011) || (instruction[6:0] == 7'b0100011) || (instruction[6:0] == 7'b1101111) || (instruction[6:0] == 7'b1100111) || (instruction[6:0] == 7'b1100011)))
+		begin
+	
+			if (T == 4)
 			begin
-				pc 	<= 1;
-				T 	<= 0;
+				pc	<= 1;	
 			end
+			if (T == 5)
+			begin
+				spm	<= 1;
+				pc	<= 0;
+			end
+			if (T == 6)
+				spm	<= 0;		
+		end
 
-		
 		//lui
 		if (instruction[6:0] == 7'b0110111)
 		begin
 		
 			REG_D <= instruction[11:7];
 			CM_REGS <= { instruction[31:12], 12'b000000000000 };
+			scmr <= 0;
+			sri <= 0;
 			
 			if (T == 4)
 			begin
 				scmr 	<= 1;
 			end
 			
-			if (T >= 5)
+			if (T >= 7)
 			begin
-				T 	<= 0;
-				pc 	<= 1;
+				sri	<= 1;
+				T 	<= 3;
+				ri	<= 1;
 			end
 		end
 		
@@ -241,7 +256,7 @@ begin
 			spca 	<= 0;
 			sar 	<= 0;
 			ALU_OP 	<= 0;
-			pc	<= 0;
+			//sri	<= 0;
 			
 			if  (T == 4)
 			begin
@@ -255,10 +270,11 @@ begin
 				sar 	<= 1;
 			end
 			
-			if (T >= 6)
+			if (T >= 7)
 			begin
+				pc	<= 1;
 				T 	<= 0;
-				pc 	<= 1;
+				//ri	<= 1;
 			end
 		end
 		
@@ -275,7 +291,7 @@ begin
                 		sraa 	<= 0;
                 		ALU_OP 	<= 0;
                 		sar  	<= 0;
-                		pc   	<= 0;
+                		sri   	<= 0;
 				
 				if (T == 4)
 				begin
@@ -289,10 +305,11 @@ begin
 					sar 	<= 1;
 			   	end
 			    
-				else if (T >= 6)
+				else if (T >= 7)
 				begin
-					pc 	<= 1;
-					T 	<= 0;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 		
@@ -307,7 +324,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -321,10 +338,11 @@ begin
 					sar	<= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 			
@@ -339,7 +357,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -353,10 +371,11 @@ begin
 					sar 	<= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 			
@@ -371,7 +390,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -385,10 +404,11 @@ begin
 					sar 	<= 1;
 				end
 	
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 			
@@ -403,7 +423,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -417,10 +437,11 @@ begin
 					sar 	<= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 			
@@ -435,7 +456,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -449,10 +470,11 @@ begin
 					sar	<= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end	
 			end
 			
@@ -467,7 +489,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 				
 				if (T == 4)
 				begin
@@ -481,10 +503,11 @@ begin
 					sar 	<= 1;
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 			end
 			
@@ -501,7 +524,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -515,10 +538,11 @@ begin
 						sar 	<= 1;
 					end
 					
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 				
@@ -532,6 +556,7 @@ begin
 					scmau 	<= 0;
 					sraa 	<= 0;
 					sar 	<= 0;
+					sri	<= 0;
 				
 					if (T == 4)
 					begin
@@ -545,10 +570,11 @@ begin
 						sar 	<= 1;
 					end
 	
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc	<= 1;					
+						sri	<= 1;
+						T 	<= 3;	
+						ri	<= 1;				
 					end
 				end
 			end
@@ -569,7 +595,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -583,10 +609,11 @@ begin
 						sar 	<= 1;
 					end	
 				
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 				
@@ -600,7 +627,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 										
 					if (T == 4)
 					begin
@@ -614,10 +641,11 @@ begin
 				        	sar <= 1;
 				    	end
 				    
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 			end
@@ -636,7 +664,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 						
 					if (T == 4)
 					begin
@@ -650,10 +678,11 @@ begin
 						sar <= 1;
 					end
 	
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 					
@@ -668,7 +697,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 						
 					if (T == 4)
 					begin
@@ -682,10 +711,11 @@ begin
 						sar <= 1;
 					end
 		
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 					
@@ -701,7 +731,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 						
 					if (T == 4)
 					begin
@@ -715,10 +745,11 @@ begin
 						sar <= 1;
 					end
 		
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 				
@@ -733,7 +764,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -747,10 +778,11 @@ begin
 						sar <= 1;
 					end
 		
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 					
@@ -761,7 +793,7 @@ begin
 					REG_A 	<= instruction[19:15];
 					REG_B 	<= instruction[24:20];
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -780,8 +812,9 @@ begin
 					begin
 						srab 	<= 0;
 						sraa 	<= 0;
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 				
@@ -793,7 +826,7 @@ begin
 					REG_A 	<= instruction[19:15];
 					REG_B 	<= instruction[24:20];
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -812,8 +845,9 @@ begin
 					begin
 						srab 	<= 0;
 						sraa 	<= 0;
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 									
@@ -824,7 +858,7 @@ begin
 					REG_A 	<= instruction[19:15];
 					REG_B 	<= instruction[24:20];
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -843,8 +877,9 @@ begin
 					begin
 						srab 	<= 0;
 						sraa 	<= 0;
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 									
@@ -855,7 +890,7 @@ begin
 					REG_A 	<= instruction[19:15];
 					REG_B 	<= instruction[24:20];
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 					
 					if (T == 4)
 					begin
@@ -874,8 +909,9 @@ begin
 					begin
 						srab 	<= 0;
 						sraa 	<= 0;
-						T <= 0;
-						pc <= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end	
 				end
 			end	
@@ -894,7 +930,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc 	<= 0;
+					sri 	<= 0;
 					
 					if (T == 4)
 					begin
@@ -908,10 +944,11 @@ begin
 						sar 	<= 1;
 					end
 					
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 			end
@@ -929,7 +966,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 			
 				if (T == 4)
 				begin
@@ -943,10 +980,11 @@ begin
 					sar 	<= 1;	
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 				
 			end
@@ -962,7 +1000,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 			
 				if (T == 4)
 				begin
@@ -976,10 +1014,11 @@ begin
 					sar 	<= 1;	
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 				
 			end
@@ -995,7 +1034,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 			
 				if (T == 4)
 				begin
@@ -1009,10 +1048,11 @@ begin
 					sar 	<= 1;	
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 				
 			end
@@ -1030,7 +1070,7 @@ begin
 				sraa 	<= 0;
 				ALU_OP 	<= 0;
 				sar 	<= 0;
-				pc	<= 0;
+				sri	<= 0;
 			
 				if (T == 4)
 				begin
@@ -1044,10 +1084,11 @@ begin
 					sar 	<= 1;	
 				end
 				
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					T 	<= 0;
-					pc 	<= 1;
+					sri	<= 1;
+					T 	<= 3;
+					ri	<= 1;
 				end
 				
 			end
@@ -1063,7 +1104,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 				
 					if (T == 4)
 					begin
@@ -1077,10 +1118,11 @@ begin
 						sar 	<= 1;	
 					end
 					
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				
 				end
@@ -1100,7 +1142,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 			
 					if (T == 4)
 					begin
@@ -1114,10 +1156,11 @@ begin
 						sar 	<= 1;	
 					end
 				
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 			end
@@ -1136,7 +1179,7 @@ begin
 					sraa 	<= 0;
 					ALU_OP 	<= 0;
 					sar 	<= 0;
-					pc	<= 0;
+					sri	<= 0;
 			
 					if (T == 4)
 					begin
@@ -1150,10 +1193,11 @@ begin
 						sar 	<= 1;	
 					end
 				
-					if (T >= 6)
+					if (T >= 7)
 					begin
-						T 	<= 0;
-						pc 	<= 1;
+						sri	<= 1;
+						T 	<= 3;
+						ri	<= 1;
 					end
 				end
 			end
@@ -1172,7 +1216,6 @@ begin
 				scsr 	<= 0;
 				srcs 	<= 0;
 				csrl	<= 0;
-				pc 	<= 0;
 				
 				if (T == 4)
 				begin
@@ -1192,8 +1235,8 @@ begin
 				if (T >= 7)
 				begin
 					csrl <= 1;
-					pc <= 1;
-					T <= 0;
+					T 	<=0;
+					pc	<= 1;
 				end
 			end
 				
@@ -1208,8 +1251,7 @@ begin
 				csbmr 	<= 0;
 				scsr 	<= 0;
 				csor 	<= 0;
-				csrl	<= 0;
-				pc 	<= 0;				
+				csrl	<= 0;			
 			
 				if (T == 4)
 				begin
@@ -1230,8 +1272,8 @@ begin
 				if (T >= 7)
 				begin
 					csrl <= 1;
-					T <= 0;
-					pc <= 1;
+					T 	<=0;
+					pc	<= 1;
 				end
 			end	
 			
@@ -1247,7 +1289,7 @@ begin
 				csbmr 	<= 0;
 				csan 	<= 0;
 				csrl	<= 0;
-				pc 	<= 0;				
+				sri 	<= 0;				
 				
 				if (T == 4)
 				begin
@@ -1268,8 +1310,8 @@ begin
 				if (T >= 7)
 				begin
 					csrl <= 1;
-					T <= 0;
-					pc <= 1;
+					T 	<=0;
+					pc	<= 1;
 				end
 			end	
 			
@@ -1284,7 +1326,6 @@ begin
 				scsr 	<= 0;
 				scmcsi 	<= 0;
 				csrl	<= 0;
-				pc 	<= 0;
 						
 				if (T == 4)
 				begin
@@ -1303,9 +1344,9 @@ begin
 				
 				if (T >= 7)
 				begin
-					csrl <= 1;
-					pc <= 1;
-					T <= 0;
+					csrl 	<= 1;
+					T 	<=0;
+					pc	<= 1;
 				end
 			
 			end
@@ -1322,7 +1363,6 @@ begin
 				scsr 	<= 0;
 				csori 	<= 0;
 				csrl	<= 0;
-				pc 	<= 0;
 				
 				if (T == 4)
 				begin
@@ -1342,8 +1382,8 @@ begin
 				if (T >= 7)
 				begin
 					csrl <= 1;
-					pc <= 1;
-					T <= 0;
+					T 	<=0;
+					pc	<= 1;
 				end
 			end
 			
@@ -1360,7 +1400,6 @@ begin
 				scsr 	<= 0;
 				csani 	<= 0;
 				csrl	<= 0;
-				pc 	<= 0;
 	
 				if (T == 4)
 				begin
@@ -1375,18 +1414,14 @@ begin
 					csani <= 1;
 				end
 	
-				if (T >= 6)
+				if (T >= 7)
 				begin
-					csrl <= 1;
-					pc <= 1;
-					T <= 0;
+					csrl 	<= 1;
+					T 	<=0;
+					pc	<= 1;
 				end
 			end		
-		end
 		
-		
-		if (instruction[6:0] == 7'b1110011)
-		begin
 			//ecall
 			if (instruction[31:15] == 17'b0)
 			begin
