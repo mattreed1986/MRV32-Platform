@@ -7,6 +7,7 @@ HARDWARE ARCHITECTURE
 	Many of the wires between modules in the platform are named according to a convention where all-caps names represent datapath items and lower case names represent control signals. The control signals are usually acronyms that contain the letters of the names of the modules they are controlling. Most control signals starting with the letter s are "setting" control signals: they set something. For example, the signal "spm" would be used for setting the signal that goes from the PC to the MAR.
 	Many of The Platform's datapath signals are continuously exerted onto the receiving modules. When the appropriate time comes for the signal to be assigned in the receiving module, a setting control signal will usually be issued that causes the receiving module to accept the waiting data and do what it should with it.
 
+
 CONTROL MODULE
 	
 	The Platform's Control Module (CM) is home to the coding of the RV32IM instructions. These instructions consist of steps, constituted by assignments to per instruction datapaths and control bits. In these steps, the control bits are activated and deactivated to direct the functioning of most of the rest of the system. Parts of the system that are not controlled by the CM are controlled by the Trap Unit. A T counter is utilized for advancement through the steps. 
