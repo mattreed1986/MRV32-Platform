@@ -33,7 +33,7 @@ reg[7:0] UART_MEM_IN;
 output reg tx;
 reg[7:0] UART_MEM_OUT;
 
-reg[17:0] baudcnt, txbaudcnt;
+reg[17:0] baudcnt, txbaudcnt, totalticks, halfticks;
 reg[13:0] interbitcount;
 reg[2:0] txstate;
 reg[3:0] rxstate;
@@ -69,6 +69,8 @@ begin
 	buffer[3] = 8'h69;
 	buffer[4] = 8'h63;
 	buffer[5] = 8'h0D;
+	totalticks = 80000000/19200;
+	halfticks = 40000000/19200;
 	buftot = 6;
 	bufcnt = 0;
 end
@@ -88,7 +90,7 @@ begin
     end
   	else if (rxstate == 3'b001) 
 	begin
-		if (interbitcount == 2604)
+		if (interbitcount == halfticks)
 		begin
 		    if (!rx)
         	    begin
@@ -104,7 +106,7 @@ begin
 	end
 	else if (rxstate == 3'b010)
 	begin
-	    if (interbitcount == 5208)
+	    if (interbitcount == totalticks)
 		    begin
            	    UART_MEM_OUT[rxbitcnt] <= rx;
 			    interbitcount <= 0;
@@ -120,7 +122,7 @@ begin
 	end
 	else if (rxstate == 3'b011)
 	begin
-		if (interbitcount == 5208)
+		if (interbitcount == totalticks)
 		begin
 			rxstate <= 3'b100;
    			interbitcount <= 0;
@@ -349,7 +351,7 @@ begin
 	end
 	else if (txstate == 3'b001)
 	begin
-	    if (txbaudcnt >= 5208)
+	    if (txbaudcnt >= totalticks)
 	    begin
     		txbaudcnt <= 0;
     		tx <= buffer[bufcnt][txbitcnt];
@@ -369,7 +371,7 @@ begin
 	end
 	else if (txstate == 3'b010)
 	begin
-	    if (txbaudcnt >= 5208)
+	    if (txbaudcnt >= totalticks)
 	    begin
 	    	if (indicators)
 	    			$display("TB TX IS %b and bit = %d", tx, txbitcnt);
@@ -382,7 +384,7 @@ begin
 	end
 	else if (txstate == 3'b011)
 	begin
-	    if (txbaudcnt >= 5208)
+	    if (txbaudcnt >= totalticks)
 	    begin
 	    	if (indicators)
 	    			$display("TB TX IS %b and bit = %d", tx, txbitcnt);
@@ -394,7 +396,7 @@ begin
 	end
 	else if (txstate == 3'b100)
 	begin
-	    if (txbaudcnt == 5208*10)
+	    if (txbaudcnt == totalticks*10)
 	    begin
 	        txbaudcnt <= 0;
 	        txstate <= 3'b000;
