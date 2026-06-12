@@ -80,4 +80,4 @@ trap_entry:
 
     addi sp, sp, 144
 
-    sret
+    mret

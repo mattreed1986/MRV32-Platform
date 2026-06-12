@@ -5,7 +5,7 @@
 back_to_shell:
 
 	la  t0, shell
-	csrrw x0, 0, t0
+	csrw mepc, t0
 	
 	addi x1, zero, 0
 	la x2, _kstack_top
@@ -39,4 +39,4 @@ back_to_shell:
 	addi x30, zero, 0
 	addi x31, zero, 0
 	
-	sret
+	mret

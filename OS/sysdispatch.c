@@ -1,5 +1,6 @@
 #include "kernel_types.h"
 
+//extern int bread_crumb_digit(int digit);
 extern context_t ctx;
 extern ssize_t syswrite( int fd, const char *buf, int size);
 extern ssize_t sysread(int fd, char *buf, int count, int raw_flag);

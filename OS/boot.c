@@ -1,6 +1,8 @@
 #include "kernel_types.h"
 
 extern void trap_entry();
+extern void write_handler();
+extern void read_handler();
 extern void shell();
 extern char _bss_start;
 extern char _bss_end;
@@ -35,10 +37,38 @@ int create_file(const char *name, uint32_t start, uint32_t size) {
     	return idx;
 }
 
+void set_mtvec(void (*mtvec)(void)) {
+    asm volatile(
+        ".insn i 0x73, 0x1, x0, %0, 0x305"
+        :
+        : "r"(mtvec)
+    );
+}
+
+void set_txvec(void (*txvec)(void)) {
+    asm volatile(
+        ".insn i 0x73, 0x1, x0, %0, 0x7C0"
+        :
+        : "r"(txvec)
+    );
+}
+
+void set_rxvec(void (*rxvec)(void)) {
+    asm volatile(
+        ".insn i 0x73, 0x1, x0, %0, 0x7C1"
+        :
+        : "r"(rxvec)
+    );
+}
+
 void boot() {
     	char *p = &_bss_start;
     	while (p < &_bss_end) *p++ = 0;
-    
+    	
+    	set_mtvec(trap_entry);
+    	set_txvec(write_handler + 32);
+    	set_rxvec(read_handler + 44);
+    	
     
     	for (int i = 0; i < MAX_FDS; i++) {
         	global_fd_table.number[i] = &fd_entries[i];

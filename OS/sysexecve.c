@@ -9,7 +9,7 @@ static inline int strcmp(const char *a, const char *b)
 }
 
 void return_from_trap() {
-    __asm__ volatile ("sret");
+    __asm__ volatile ("mret");
 }
 
 int parse_argv(char *input, char arg_storage[5][64], char *argv_array[5]) {
@@ -47,9 +47,9 @@ int find_file(const char *name) {
     return -1;
 }
 
-void set_sepc(unsigned long addr) {
+void set_mepc(unsigned long addr) {
     asm volatile(
-        ".insn i 0x73, 0x1, x0, %0, 0x141"
+        ".insn i 0x73, 0x1, x0, %0, 0x341"
         :
         : "r"(addr)
     );
@@ -68,7 +68,7 @@ int sysexecve(char *argv) {
     	return 0;
     }
     
-    set_sepc(dir_table[idx].starting_addr);      
+    set_mepc(dir_table[idx].starting_addr);      
 
     asm volatile ("mv a0, %0" : : "r" (argc));
     asm volatile ("mv a1, %0" : : "r" (argv_array));

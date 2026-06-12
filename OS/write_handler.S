@@ -1,5 +1,19 @@
 .globl write_handler
 #.align 4
+bread_crumb_digit:
+    addi	a2, x0, 0		# set a2 to 0
+    lui 	a4, 2			# prepare for UART_TX_BUF 1795*4
+    addi	a4, a4, -1012		# ...
+    lui 	a5, 2			# prepare for UART_TRIG 1797*4
+    addi	a5, a5, -1004		# ...
+    addi	a6, x0, 1		# 1 utility register 
+    addi	a0, a0, 0x30   		# prepare ascii code for single digit
+    sb   	a0, 0(a4)    		# write that byte to UART TX
+    sb		a6, 0(a5)		# store 1 in UART_TRIG
+    sb		x0, 0(a5)		# store 0 in UART_TRIG
+    addi	a0, x0, 1		# return 1
+    ret					# ...
+
 write_handler:
     addi	a2, x0, 0		# set a2 to 0
     lui 	a3, 2			# prepare for a3 = 1997*4
