@@ -1,15 +1,17 @@
 module testbench();
 
 reg CLK;
-reg tx;
-reg rx, tx_trig;
-System r1(CLK, tx, rx);
+reg tx, mosi, cs, sclk;
+reg rx, tx_trig, miso;
+reg[5:0] cnt;
+System r1(CLK, tx, rx, miso, mosi, cs, sclk);
 
 tbUART tbUART1(CLK, tx, rx, tx_trig);
 
 initial
 begin
 	CLK <= 1'b0;
+//	cnt <= 0;
 end
 	
 always
@@ -17,10 +19,17 @@ begin
 	#1 CLK = ~CLK;
 end	
 
+always @(posedge CLK)
+begin
+//	$display("count = %d", cnt);
+//	cnt <= cnt + 1;
+end
+
 initial
 begin
-	#3441600 tx_trig <= 1;
-	#1404160
+	//#100
+	#2441600 tx_trig <= 1;
+	#16300000
 	$finish;
 end
 
@@ -343,6 +352,7 @@ always @(posedge clk)
 begin
 	if (txstart && txstate == 3'b000)
 	begin
+		//$display("beginning tx in UART");
 	    tx <= 1'b0;
 	    txstate <= 3'b001;
 	    txready <= 0;
@@ -396,8 +406,9 @@ begin
 	end
 	else if (txstate == 3'b100)
 	begin
-	    if (txbaudcnt == totalticks*10)
+	    if (txbaudcnt == totalticks*15)
 	    begin
+		//$display("finishing tx in UART");
 	        txbaudcnt <= 0;
 	        txstate <= 3'b000;
 	        txready <= 1;
