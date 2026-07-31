@@ -32796,12 +32796,12 @@ begin
 	ram[32767] = 32'd0;
 end
 
-/*
-for ram -> uart, dev_start_signal goes into ramcontin[0]
-*/
-
 always @*
 begin
+    sdevbyte            = 1'b0;
+    dev_stop_signal     = 1'b0;
+    address_progression = 1'b0;
+    ramcontin           = 8'b0;
     if (CSR_DEV_BUS_IN == 1 && CSR_DEV_BUS_OUT == 2)
     begin
 	    ramcontin[0] = dev_start_signal;
@@ -32832,9 +32832,6 @@ begin
     	sdevbyte = ramcontout[0];
     end
 end
-
-//always@*
-//$display("dss = %b", dev_stop_signal);
 	
 wire [31:0] ram_addr = MAR_RAM[31:0];
 wire [29:0] word_addr = ram_addr[31:2];
