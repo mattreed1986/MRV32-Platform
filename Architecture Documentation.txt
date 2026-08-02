@@ -1,22 +1,23 @@
-This document explains the platform’s hardware, software, and their inner workings.
-(Last revised: July 18, 2026)
+This document explains the platform’s hardware, software, and some of its more common processes.
+(Last revised: Aug 2, 2026)
 
 
 HARDWARE ARCHITECTURE
 
-	The MRV32 Platform hardware can be described as centrally controlled with a point-to-point (module to module) datapath. This means that most of the control signals proceed from the Control Module (CM) to the other individual modules. The rest of the control signals come from the Trap Unit (TU), which handles trap control signals, which involve the Program Counter (PC), the CSRs, and privilege level control.
-	Many of the wires between modules in the platform are named according to a convention where all-caps names represent datapath items and lower case names represent control signals. The control signals are usually acronyms that contain the letters of the names of the modules they are controlling. Most control signals starting with the letter s are "setting" control signals: they set something. For example, the signal "spm" would be used for setting the signal that goes from the PC to the MAR.
-	Many of The Platform's datapath signals are continuously exerted onto the receiving modules. When the appropriate time comes for the signal to be assigned in the receiving module, a setting control signal will usually be issued that causes the receiving module to accept the waiting data and do what it should with it.
-
+	The MRV32 Platform's processor can be described as centrally controlled with a point-to-point (module to module) datapath. This means that most of the control signals proceed from the Control Module (CM) to the other individual modules. The rest of the control signals come from the Trap Unit (TU), which handles trap control signals, which involve the Program Counter (PC), the CSRs, and privilege level control.
+	Peripheral modules in MRV32 are connected to the processor via a bus that is connected to the RAM, which is wired point to point with the memory address register and the thirty-two general purpose registers. This is because the MRV32 kernel is set up to perform reads from and writes to the peripherals via the memory.
+	Many of the wires between modules in the platform are named according to a convention where all-caps names represent datapath items and lower case names represent control signals. The control signals are usually abbreviations of the modules they control. Most control signals starting with the letter s are "setting" control signals: they set something. For example, the signal "spm" would be used for setting the signal that goes from the PC to the MAR.
+	Many of The Platform's datapath signals are continuously driven onto the receiving modules. When the appropriate time comes for the signal to be assigned in the receiving module, a setting control signal will usually be issued that causes the receiving module to accept the waiting data and do what it should with it.
+	Appendix B contains a list of important datapaths and control signals per module.
 
 CONTROL MODULE
 	
-	The Platform's Control Module (CM) is home to the coding of the RV32IM instructions. These instructions consist of steps, constituted by assignments to per instruction datapaths and control bits. In these steps, the control bits are activated and deactivated to direct the functioning of most of the rest of the system. Parts of the system that are not controlled by the CM are controlled by the Trap Unit. A T counter is utilized for advancement through the steps. 
-	The steps of every instruction in the platform can be broken down into two sets: the fetch cycle and the execution cycle. The following paragraphs provide a view into each cycle's purpose and functioning.
-	The fetch cycle retrieves the instruction from memory. This occurs with the help of the PC, Memory Address Register (MAR), RAM, Instruction Register (IR), and the CM. Before the official fetch cycle of an instruction, the PC is usually incremented. In the event that the PC is incremented, the purpose of doing so is to ensure that the next instruction will ultimately be fetched by the CM, as opposed to the one that the PC is currently pointing to. If the PC is not incremented, it is because the current instruction is a jumping or branching instruction. These instructions set the PC themselves. Once the PC is incremented, the CM issues an spm (set pc mar) signal to the MAR, which cause it to assign the value being assigned onto it by the PC to the "MAR" reg. This reg is continuously asserted onto the RAM to select an active RAM address. The MAR -> RAM datapath does not require a control bit for latching: whatever the MAR is set to, that will be the active RAM address. After the RAM has been accessed in a clocked fashion, sri (set ram ir) is issued to register the contents of that RAM address in the IR. The contents of the IR are asserted onto the CM using combinational logic, similar to the MAR -> RAM datapath.
-	The execution cycle is the part of the instruction that is unique to each instruction. It is the "business end" of the instruction. Here, the control bits and datapaths are set to perform the instruction's intended task. Without the execution cycle, there would be no point to having an instruction at all. The CM is directed to the steps of the execution cycle for any given instruction by the word (32 bit contents of RAM containing the instruction) that was fetched from the RAM.
-	Though T is initialized at 0, not every instruction starts at T = 0. This is because MRV32 utilizes a simultaneous fetch and execute system for the majority of its instructions. For instructions following a simultaneous fetch/execute, there is a 3 T count reduction in number of steps. Excluding hardware division and associated instructions, this is roughly an average of 38% reduction in instruction time when utilized.
-
+	The Platform's Control Module (CM) contains the implementation of the RV32IM instruction set. These instructions consist of steps, constituted by assignments to per instruction datapaths and control bits. In these steps, the control bits are activated and deactivated to direct the functioning of most of the rest of the system. Parts of the system that are not controlled by the CM are controlled by the Trap Unit. For peripherals, the CM control signals are routed through the full duplex control bus, entering via the RAM. 
+	A T counter is used for advancement through the instruction steps. The steps of every instruction in the platform can be broken down into two sets: the fetch cycle and the execution cycle. The following paragraphs provide a view into each cycle's purpose and functioning.
+	The fetch cycle retrieves the instruction from memory. This occurs with the help of the PC, Memory Address Register (MAR), RAM, Instruction Register (IR), and the CM. Before the official fetch cycle of an instruction, the PC is usually incremented. In the event that the PC is incremented, the purpose of doing so is to ensure that the next instruction will ultimately be fetched by the CM, as opposed to the one that the PC is currently pointing to. If the PC is not incremented, it is because the current instruction is a jumping or branching instruction. These instructions set the PC themselves. Once the PC is incremented, the CM issues an spm (set pc mar) signal to the MAR, which causes it to latch the value currently presented by the PC to the "MAR" reg. This reg is continuously asserted onto the RAM to select an active RAM address. The MAR -> RAM datapath does not require a control bit for latching: whatever the MAR is set to, that will be the active RAM address. After the RAM has been accessed in a clocked fashion, sri (set ram ir) is issued to register the contents of that RAM address in the IR. The contents of the IR are asserted onto the CM using combinational logic, similar to the MAR -> RAM datapath.
+	The execution cycle is the part of the instruction that is unique to each instruction. It is the "business end" of the instruction. Here, the control bits and datapaths are set to perform the instruction's intended task. Without the execution cycle, Without the execution cycle, the instruction would accomplish nothing. The CM is directed to the steps of the execution cycle for any given instruction by the word (32 bit contents of RAM containing the instruction) that was fetched from the RAM.
+	Though T is initialized at 0, not every instruction starts at T = 0. This is because MRV32 utilizes a simultaneous fetch and execute system for the majority of its instructions. For instructions following a simultaneous fetch/execute, there is a 3 T count reduction in number of steps. Excluding hardware division and associated instructions, this is roughly an average of 38% reduction in instruction time when used. This is because, for most instructions, the fetch cycle overlapped the last instruction and is already finished, and now the entire instruction is just the execution cycle. An instruction that was 7 states is now just 4.
+	
 	 
 PROGRAM COUNTER
 
@@ -41,21 +42,27 @@ RANDOM ACCESS MEMORY
 	
 INSTRUCTION REGISTER
 
-	The Instruction Register gets the instruction from the RAM and holds it for the Control Module. In a more advanced system, it would serve the purpose of acting as a high-speed buffer for instructions on their way from the memory to the CM.
+	The Instruction Register receives the instruction from the RAM and holds it for the Control Module. In a more advanced system, it would serve the purpose of acting as a high-speed buffer for instructions on their way from the memory to the CM.
 	
 	
 GENERAL PURPOSE REGISTERS
 	
-	In a computer processor, it is necessary to have small pieces of memory for holding the data that it stores in RAM, loads from RAM, uses as targets for jumps, etc. These are called registers (REGS). An RV32 computer has 32 registers, each used for specific things according to the ABI. The registers are 32 bits wide, and register #0 (x0) is kept at 0. 
-	The vast majority of other modules in the platform are connected to the registers. These include the CM, PC, ALU, CSRs, RAM, MAR, and UART. That's because they are the go-to for temporarily holding and manipulating data. 
+	In a computer processor, it is necessary to have small pieces of memory for temporarily holding data loaded from RAM, computation results, addresses, and function arguments. These are called registers (REGS). An RV32 computer has 32 registers, each used for specific things according to the ABI. The registers are 32 bits wide, and register #0 (x0) is kept at 0. 
+	The vast majority of other modules in the platform are connected to the registers. These include the CM, PC, ALU, CSRs, RAM, MAR, and UART. This is because they are the go-to for temporarily holding and manipulating data. 
 	The REGS module in MRV32 is clocked and uses a write mux to select its source of writeback data. The control signal that is asserted serves as both the writeback enable and the controller for the mux.
 	
+ARITHMETIC LOGIC UNIT
+	
+	In most processors, the Arithmetic Logic Unit (ALU) is where the math happens. Though it depends on the architecture, in MRV32, the ALU specifically handles arithmetic, bitwise operations, and inequalities (branching and otherwise.)
+	The MRV32 ALU receives its control signals in the form of opcodes. Each opcode is assigned a number, both in the CM and in the ALU. Each ALU operation is assigned a numeric opcode and used to control which operation is performed. Once set up, it makes it easy to see that the right control signal is being sent.
+	Thanks to a third party algorithm that was adapted for ALU use, MRV32 supports hardware division in its ALU.
 
 CONTROL AND STATUS REGISTERS
 	
 	RISC-V reserves a special set of registers for keeping track of trap entry point, trap cause, scratch information, and other things. These are called CSRs (Control and Status Registers.) Not all RISC-V computers share the same CSRs, a common set would include the following:
 	
 	-misa: 		(instruction set architecture)
+	-mscratch	(machine scratch register)
 	-mstatus	(machine status)
 	-mtvec		(machine trap vector)
 	-mepc		(machine exception PC)
@@ -67,28 +74,26 @@ CONTROL AND STATUS REGISTERS
 	-instret	(retired instruction count)
 	-mhartid	(hardware thread number)
 
-These (plus tx and rx interrupt vectors) also happen to be the CSRs that are included in MRV32.
-	One special CSR is the "device select" (devsel). Its purpose is to route loads and stores (reads and writes) to either the REGS or the SD card controller. It does this by changing the control bits in the CM for the lbu and sb instructions. When CSR_DEV_SEL == 0, lbu and sb work as they always have: they load and store between REGS and RAM. When the devsel == 1, the lbu and sb instructions use their specified registers (rs1, rs2, and rd) to specify which memory address and SD card block address will be accessed during the transaction. The bytes are transferred in or out for the transaction, as described in the SD CARD CONTROLLER section, and there is a direct link between the RAM and the SD Card Controller over which the data is transferred.
-	
-	
-ARITHMETIC LOGIC UNIT
-	
-	In most processors, the Arithmetic Logic Unit (ALU) is where the math happens. Though it depends on the architecture, in MRV32, the ALU specifically handles arithmetic, bitwise operations, and inequalities (branching and otherwise.)
-	The MRV32 ALU gets its control signals in the form of opcodes. Each opcode is assigned a number, both in the CM and in the ALU. Those numbers are assigned to registers and used to control which operation is performed. Once set up, it makes it easy to see that the right control signal is being sent.
-	Thanks to a third party algorithm that was adapted for ALU use, MRV32 supports hardware division in its ALU.
-	
-	
+These (plus the rx interrupt vector, peripheral bus in (busin), and peripheral bus out (busout)) also happen to be the CSRs that are included in MRV32. Peripheral buses in and out are used to control the peripheral bus, mentioned later.
+		
 TRAP UNIT
 
 	The purpose of the Trap Unit (TU) in a RISC-V system is to manage the handling of syscalls and other interrupts. Syscalls and interrupts are special OS functions that are separate from the user program and are used for input, output, file opening and closing, starting and exiting user programs, etc. 
-	This functioning can vary according to the hardware, but in the MRV32 Platform it is relatively straightforward. There are three trap vectors: mtvec, tx interrupt vector, and rx interrupt vector. When an ecall instruction is issued, the PC goes straight to mtvec. This is for the purpose of performing kernel functions (syscalls). For example, if your user program were to want to put some text on the screen, it would load registers x10 through x12, as well as x17 with the appropriate file descriptor, a pointer to the text, how many characters to print, and the syscall number for "sys_write" (which is the syscall for putting text on the screen in the platform), and then an ecall would be issued. The PC would jump straight to mtvec (which is loaded into the hardware at boot), the return address would be stored in mepc, and the kernel code for sys_write would be dispatched. Then, your text would appear on the screen. One special thing about sys_write is that it actually contains an interrupt inside of an interrupt, which means that inside of the kernel code, which is accessed via interrupt, a second interrupt occurs for putting the characters on the screen. The main difference between the tx interrupt and the initial syscall (in MRV32) is that the tx interrupt stores the return value in "ra" (a register reserved for return addresses) and not a CSR. 
+	This functioning can vary according to the hardware, but in the MRV32 Platform it is relatively straightforward. There are two trap vectors: mtvec and rx interrupt vector. When an ecall instruction is issued, the PC goes straight to mtvec. This is for the purpose of performing kernel functions (syscalls). For example, if your user program were to want to put some text on the screen, it would load registers x10 through x12, as well as x17 with the appropriate file descriptor, a pointer to the text, how many characters to print, and the syscall number for "sys_write" (which is the syscall for putting text on the screen in the platform), and then an ecall would be issued. The PC would jump straight to mtvec (which is loaded into the hardware at boot), the return address would be stored in mepc, and the kernel code for sys_write would be dispatched. Then, your text would appear on the screen.
+	
+PERIPHERAL CONTROL BUS
+
+	The combinationally assigned peripheral bus dynamically connects the selected peripheral. In MRV32, the RAM is similar to the gate of a city. Inside the gate is the CPU. The primary datapath into and out of the processor is the RAM. MRV32 is set up this way to complement its read/write syscall functions. Whenever a byte is read from or written to a peripheral device (such as the UART or the SD Card reader), it goes to or comes from a buffer in the memory. This is also what happens, very simply, in hardware. A byte is transferred straight to/from the peripheral device in use from/to the RAM. If the data needs further processing, it can be read using a load instruction and then further handled.
+	Control and Status Registers are used to control what goes to the bus and what comes out. CSR busin is used to determine which device (RAM, UART, SD card) feeds the bus. CSR busout is used to determine which device the bus feeds. RAM, UART, and SD card are coded 1, 2, and 3, respectively. For example, if busin equals 1 and busout equals 2, then the data will be routed from the RAM to the UART. In case a write would be performed, and a new character would show up on the screen.
+	Also controlled by busin and busout are the peripheral control channels. There are two channels, and they are both 8 bits wide, operating in full duplex. Whenever busin or busout changes, the controls are routed to the appropriate interfacing port inside the proper module. This allows for one interface per peripheral to be used for any of the device combinations. These controls are used for communication between active devices. If a signal needs to be inserted to a peripheral from the CM, it can be set up in the RAM with an outgoing control bit that will show up on the other side of the control bus.
+	While the active bus devices are selected via CSR, the actual execution of the read/write happens due to a modified "store byte" (sb) instruction. When busin and busout are 0, the sb behaves normally, storing register data to the memory. However, when the CSRs are set to numbers corresponding to devices on the bus, the instruction initiates a byte movement from one device to the other. This combination of CSRs and alternate instruction execution eliminates the need for MMIO, scales well, and eliminates the need for a web of point to point wiring.
 	
 	
 SD CARD CONTROLLER
 
-The SD card controller is the module that issues commands to the SD card via the SPI Engine for reading from or writing to the SD card. This takes place in stages. First, the controller first needs to initialize the card. Then, it will be in a position to either write or read to or from the SD card. This requires going through a sequence of transmitted commands and received responses. Once the card is initialized, it is free to make reads or writes.
+	The SD card controller is the module that issues commands to the SD card via the SPI Engine for reading from or writing to the SD card. This takes place in stages. First, the controller needs to initialize the card. Then, it will be in a position to either read from or write to the SD card. This requires going through a sequence of transmitted commands and received responses. Once the card is initialized, it is free to make reads or writes.
 
-The MRV32 Platform currently uses single block reads and writes to transfer data. For reads and writes, a command with the desired SD card storage block as the argument needs to be issued. For reads, clocks are fed to the card along with 0xFFs, and the data is read from the output of the card. For writes, clocks are fed to the card and the input to the card is fed the bits to be written, starting with the MSB. The whole, detailed process for SD card initialization, reads, and writes can be found in the appendix.
+The MRV32 Platform currently uses single block reads and writes to transfer data. For reads and writes, a command with the desired SD card storage block as the argument needs to be issued. For reads, clocks are fed to the card along with 0xFFs, and the data is read from the output of the card. For writes, clocks are fed to the card and the input to the card is fed the bits to be written, starting with the MSB. The whole, detailed process for SD card initialization, reads, and writes can be found in Appendix A.
 
 
 SAR
@@ -120,7 +125,7 @@ BOOT
 	On booting up, the OS does six things: it clears the shell/kernel bss, sets the trap/interrupt vectors, initializes the file descriptor number pointers, sets the type of the first three file descriptors, creates the file directory with the starting user programs/files, and jumps to the shell. 
 	The bss clear is just the typical loop. It goes from memory address to memory address, setting them all to 0.
 	Setting the trap/interrupt vectors is crucial. Assembly code is used to write the CSRs. This happens so that the PC will be set properly when kernel functions are called. 
-	Once the bss is cleared, each file descriptor number gets set to point to a corresponding fd_entry. The purpose of this is to ensure that the global_fd_table.numbers reference valid memory.
+	Once the bss is cleared, each file descriptor number is set to point to a corresponding fd_entry. The purpose of this is to ensure that the global_fd_table.numbers reference valid memory.
 	The next step, setting the file descriptor types, is what prepares the OS for standard input and output. Without this step, there would be nothing defining the behavior of writes and reads that would be intended to go to the TTY (teletypewriter).
 	Since this OS has such a simple directory structure and file handling system, it just stores each file's name, starting address, and size from the beginning in a directory table. This allows for executing and retrieving programs and files and creating new ones without clobbering existing ones.
 	Once all of this is finished, the CPU jumps to the shell for the input of commands. This is done by just calling the shell() function, concluding the boot sequence without returning.
@@ -128,19 +133,19 @@ BOOT
 
 DIRECTORY STRUCTURE
 
-	The directory structure is a struct called directory_entry_t with attributes name[MAX_FILENAME], starting_addr, size, and used. There are MAX_FILENAME entries in the table, and the used attribute allows the OS to see which entries are in use so that it can turn an unused entry into a new file.
+	The directory structure is a struct called directory_entry_t with attributes name[MAX_FILENAME], starting_addr, size, and used. The name is MAX_FILENAME chars long, and the used attribute allows the OS to see which entries are in use so that it can turn an unused entry into a new file.
 
 	
 TRAP ENTRY/SYSCALL DISPATCH
 
 	When a syscall is issued, the first thing that happens is the context save. This occurs via the trap entry function. In this function, all of the registers are saved to the stack, and the context pointer is saved as a0, making it the argument for the next function, sys_dispatch.
 	Sys_dispatch is named after its function: it dispatches the syscalls. The original a0 from before calling sys_dispatch is restored via the context pointer (where all of the registers were saved). This way, it is ready for the particular syscall that will be issued. In the RISC-V ABI, register a7 is the syscall identifier, so it is assigned to a variable in sys_dispatch and a switch statement is used to direct the execution to the correct syscall.
-	When the syscall is complete, it generally returns a value. If there was a problem, the return value will be -1. The value is returned to the user program via a0, the PC gets incremented inside the memory that context* points to, and execution returns to the original trap entry function. Once back in trap entry, all of the registers are restored, as well as the stack pointer. Then sret is called and execution of the user program resumes.
+	When the syscall is complete, it generally returns a value. If there was a problem, the return value will be -1. The value is returned to the user program via a0, the PC increments inside the memory that context* points to, and execution returns to the original trap entry function. Once back in trap entry, all of the registers are restored, as well as the stack pointer. Then sret is called and execution of the user program resumes.
 	
 	
 SHELL
 
-	The OS's shell prints a prompt via write syscall and takes input via read sys_calls. It includes support for backspace and delete. Once the input has been taken, the string is processed so that it can be passed to the execve syscall (which is responsible for launching user programs), which will either start the program or print "INVALID COMMAND." This works by execve returning 0 if it fails to open the program. 
+	The OS's shell prints a prompt via write syscall and takes input via read syscalls. It includes support for backspace and delete. Once the input has been taken, the string is processed so that it can be passed to the execve syscall (which is responsible for launching user programs), which will either start the program or print "INVALID COMMAND." This works by execve returning 0 if it fails to open the program. 
 
 
 SYSCALLS AND FILE DESCRIPTORS
@@ -153,7 +158,7 @@ SYSWRITE AND SYSREAD
 
 	The sys_write syscall writes data to the TTY or a file. Its arguments include the following: target FD, a pointer to the buffer that is being written, and the number of bytes to be written. Its flow starts off with a check on the validity of the provided FD number. If the FD is less than 0, sys_write will return -1, which can be used to signal to a user program that there was an error. After this, the syscall branches into its handling of different file object types. 
 	For type "FT_FILE," the write process is fairly straightforward. A write_address pointer is set up and the starting address of the FD table number entry is assigned to the pointer. Then, the FD table number's position is used as an index for the write_address pointer, and the first element of the input buffer is written to that write address. The position is incremented, and the assignment of buffer to write address proceeds until the prescribed number of bytes is written.
-	The code that handles type "FT_TTY," written in assembly, sends characters to the UART until the number of bytes is written. The process works by storing the number of bytes to be written in RAM word address 1997. When the value at this address is nonzero, there is a TX interrupt, which fires initially when 1997 is set and subsequently when a UART transmission finishes, causing the PC to jump to the TX interrupt vector, which is set to the address of the instruction that stores the number of bytes in 1997. One might ask, "If the vector is set to the instruction that makes the CPU jump to the vector, then how does program proceed?" When 1997 is updated, it starts the transmission process FSM (Finite State Machine: the type of Verilog mechanism that allows sequential execution), which contains the directive to jump to the vector early on but cannot restart until the character's transmission is finished. At the end of the TTY write, the PC gets set to the TX interrupt vector, and 0 gets assigned to 1997. The program's flow is diverted away from the transmission loop and it jumps to the return address.
+	The code that handles type "FT_TTY," written in assembly, sends characters to the UART until the number of bytes is written. The process works by storing the number of bytes to be written in RAM word address 1997. When the value at this address is nonzero, there is a TX interrupt, which fires initially when 1997 is set and subsequently when a UART transmission finishes, causing the PC to jump to the TX interrupt vector, which is set to the address of the instruction that stores the number of bytes in 1997. One might ask, "If the vector is set to the instruction that makes the CPU jump to the vector, then how does program proceed?" When 1997 is updated, it starts the transmission process FSM (Finite State Machine: the type of Verilog mechanism that allows sequential execution), which contains the directive to jump to the vector early on but cannot restart until the character's transmission is finished. At the end of the TTY write, the PC gets set to the TX interrupt vector, and 0 is assigned to 1997. The program's flow is diverted away from the transmission loop and it jumps to the return address.
 	Sys_read is similar to sys_write. It starts with the FD < 0 check, and then it either reads from the TTY or a file. Its arguments include FD, buffer to be read from, byte count, and the raw flag. The raw flag is used to choose either raw or canonical mode for TTY reads. More on this later.
 	When reading from a file, the process is similar to writing a file. A read address pointer is set up, initialized to the starting address of the FD number entry. Then, position indexed read address is assigned to the buffer. The number of bytes read is returned.
 	The TTY read handler is a little different, but like the TTY write handler, it sits on a wfi instruction for a portion of its cycle and relies upon an interrupt vector. It works by sitting on a wfi (wait for interrupt) until an RX interrupt comes, then jumping to the RX interrupt vector when a key is pressed.
@@ -180,8 +185,71 @@ SYSEXECVE AND SYSEXIT
 	Sys_exit is very simple. Its purpose is to stop the execution of the user program and return to the shell. It loads sepc with the address of the beginning of the shell function, clears all of the registers, and issues sret, which launches the shell.
 	
 	
-APPENDIX - SD CARD PROCESS
---------------------------
+PER INSTRUCTION WALKTHROUGHS
+
+	The RV32I instruction set comes to 40 instructions. These 40 instructions are broken down into six types: R (Register to Register), I (Immediate and Loads), S (Store), B (Conditional Branch), U (Upper Immediate), and J (Unconditional Jump). Beyond these, the MRV32 also has instructions for CSRs, hardware multiplication and division, and supervisory level change. In this section, we will walk through the control and data movement of each type of instruction. 
+	
+	
+R Type
+	
+	The add instruction will serve as the example for R type instructions. Instructions of this type generally involve two operands being operated on by the ALU. The resulting value is returned to the registers for storage. RS1 and RS2 (REG_A and REG_B in MRV32) are the operands, ALU_OP is the operator, and RD is the register to which the result is returned.
+	The instruction's machine code form is as follows:
+	
+	7'b0 rs2[24:20] rs1[19:15] 000 rd[11:7] op {0110011}
+	
+	As can be seen, the instruction contains the five bit codes for RS1, RS2, and RD, as well as the other information that identifies the instruction for decoding.
+	In the CM, the instructions are written in a way that if a control bit is involved in the instruction and is not immediately necessary, it will default to 0. Also, before any control bits are set, the pertinent information is extracted from the machine code and is sent off via its datapath.
+	ALU operations vary by the processor, but in MRV32 the execution cycle for R type instructions starts with sraa and srab going high and the ALU op-code (ALU_OP) being set. The control bits sraa and srab perform the task of letting the ALU know that it will need to latch REG_A and REG_B for operation. 
+	Once the ALU has set its operands and its operator, it combinationally computes the result. Since this happens instantaneously after ALU_OP sets, the result is waiting to be registered as REG_D by the next clock cycle. This is the purpose of sar, which goes high on the second step of the execution cycle. This registering sets the wb_en (write back enable) and wb_data (write back data) of the Registers module and writes the result in REG_D, concluding the R type instruction.
+	
+
+I Type
+
+	I type instructions include loads and ALU operations involving some value that comes prepackaged in the instruction. This value is known as an immediate. The destination module of the immediate depends on whether the instruction is a load or an ALU operation.
+	This type of instruction comes encoded with three important pieces of data: RS1, RD, and the immediate. Its machine code form is as follows:
+	
+	imm[11:0] rs1[19:15] 000 rd[11:7] op {0010011}
+	
+	ALU I type instructions are similar to R type instructions, except instead of involving two register operands, they involve one register operand and an immediate operand. 
+	One example of an ALU I type instruction is addi. It works by first extracting the RS1, RD, and the immediate. The immediate is sent to the ALU, via CM_ALU. At T = 4 scma and sraa are both raised and the ALU_OP is set. This is very similar to R type instructions, in that the ALU gets two operands and an operator. The ALU performs its operation, and then at T = 5, sar is raised, and RD is sealed.
+	Loads are the instruction equivalent to accessing a dereferenced pointer. They have similar machine code anatomy to the ALU type, but the immediate goes to the MAR instead. This, and RS1, are for the purpose of setting up the desired RAM address to load from. 
+	The example instruction will be lb. To start the instruction, rpi (regs plus immediate) is used to set the MAR to the sum of the immediate and the signal coming from the REGS. Next, sramrs8 (set ram regs signed 8 bit) is raised. The instruction is finished by raising crm (clear MAR).
+	
+	
+S Type
+
+	The S type instruction is the opposite of the load instruction. It is like storing a value in a dereferenced pointer. Encoded in the instruction are RS1, RS2, and an immediate (though it is worth noting that the immediate has an unconventional encoding order).
+	
+	
+B Type
+
+	The conditional branch type instruction is used to determine the flow of the program based on a comparison of the values in selected registers. The B type instructions are encoded with two registers- RS1 and RS2 and an address to branch to. The ALU is used to make the comparison. 
+	Branching instructions start off by raising sraa and srab and sending an ALU_OP, similar to R type instructions. The ALU returns a signal called bacm (branch ALU CM), and that determines whether the branch is taken. This control signal also goes into the PC to cause it to take the branch.
+	Branching instructions have the following machine code form:
+	
+	imm{[12],[10:5]}rs2[24:20]rs1[19:15]000imm{[4:1],[11]}op{0100011}
+	
+
+U Type
+
+	Upper immediate (U type) instructions are used to make large numbers. The instruction lui (load upper immediate) will be the example. It is a fairly simple instruction. All it does is create a number that is 2^12 or greater. 
+	The instruction starts by decoding RD and the immediate. Then, scmr (set CM REGS) is raised, which causes the registers to uptake the immediate, which is already multiplied by 2^12. This creates a large number that can be used in the construction of more precise large numbers.
+	Load upper immediate is as follows in machine code:
+	
+	imm[31:12] rd[11:7] op {0110111}
+	
+
+J Type
+
+	There is only one of this type of instruction: jal. It is called an unconditional jump. The instruction has an immediate encoded, and the PC will jump that far no matter what.
+	The process for executing jal is as follows: spcrt (set PC REGS temp) goes high to give the PC value to the REGS, spcr (set PC REGS) goes high to register the PC value + 4 to RD, then pcpi (PC plus immediate) goes high to add the immediate to the PC. What you end up with is a PC that has jumped the distance of the immediate and an RD that contains the return address for the jump. This is useful for when you know you are calling a function and will return.
+	The machine code looks like this:
+	
+	imm{ [19] , [9:0] , [10] , [18:11] } rd[11:7] op {1101111}
+	
+	
+APPENDIX A - SD CARD PROCESS
+----------------------------
 
 In this appendix, the process used by MRV32 for initializing and transferring data to and from an SD card with be explained from beginning to end in detail.
 
@@ -237,4 +305,91 @@ Single Block Read-
 	-Send 0xFF until you get 0xFE back
 	-Send 0xFFs until you have read 512 bytes
 	-raise cs
+
+
+APPENDIX B - KEY CONTROL BITS PER MODULE
+------------------------------------------------------------
+
+PROGRAM COUNTER
+
+pc 		- increments (+4) the program counter
+scspcecall 	- assigns mtvec to the program counter
+scspcmret	- assigns mepc to the program counter
+
+
+MAR
+
+smi		- sets immediate equal to CM_MAR
+srm & srmp	- sets MAR to REGS_MAR
+crm		- clears MAR
+mpi		- adds immediate to MAR (from CM)
+spm		- set MAR to PC_MAR
+rpi		- set MAR to REGS_MAR plus CM_MAR
+address_progression - sets up increment_mar for the next clock cycle
+increment_mar 	- increments MAR
+
+
+SAR
+
+srs & srsp	- sets SAR to REGS_SAR
+
+
+CSR
+
+scmcs		- sets immediate to CM_CSRI
+srcs		- sets CSR to REGS_CSR
+csor		- sets CSR to CSR | REGS_CSR
+csan		- sets CSR to CSR & ~REGS_CSR
+scmcsi		- sets CSR to the five bit immediate
+csori		- sets CSR to CSR | five bit immediate
+csani		- sets CSR to CSR | inverted five bit immediate
+scmcs		- sets CSR to selected CSR
+stucsr		- sets CSR to mtvec
+csrl		- sets selected CSR to CSR
+
+
+IR
+
+sri		- sets instruction to RAM_IR
+
+
+TRAP UNIT
+
+ecall		- initiates syscall
+mret		- returns from machine mode privilege level
+
+
+ALU
+
+spca		- set ALU_A to PC_ALU
+sraa		- set ALU_A to REGS_A
+srab		- set ALU_B to REGS_B
+scma		- set ALU_B to CM_ALU
+scmau		- set ALU_B to CM_ALU(unsigned)
+
+
+RAM
+
+srr8		- set RAM to REGS[7:0]
+srr16		- set RAM to REGS[15:0]
+srr32		- set RAM to REGS[31:0]
+sramrs8		- set REGS to RAM[7:0](signed)
+sramrs16	- set REGS to RAM[15:0](signed)
+sramrs32	- set REGS to RAM[31:0](signed)
+sramru8		- set REGS to RAM[7:0](unsigned)
+sramru16	- set REGS to RAM[15:0](unsigned)
+
+
+REGS
+
+spcr & spcrt	- set REGS to PC_REGStemp + 4
+sar		- set REGS to ALU_REGS
+scsr		- set REGS to CSR_REGS
+sramrs8		- set REGS to RAM_REGS[7:0](signed)
+sramrs16	- set REGS to RAM_REGS[15:0](signed)
+sramrs32	- set REGS to RAM_REGS[31:0](signed)
+sramru8		- set REGS to RAM_REGS[7:0](unsigned)
+sramru16	- set REGS to RAM_REGS[15:0](unsigned)
+
+
 
