@@ -1,6 +1,12 @@
-module SD_Controller(clk, reset, ss, start, tx_byte, sdc_wirq_en, sdc_rirq_en, srr8, srr32, next_read_address, next_write_address, cs_en, clk_on, clk_cnt, rx_byte, busy, done, card_busy, sd_read_interrupt, sd_write_interrupt, SDC_DEV, DEV_SDC, MAR_DEV, SAR_SDC, sdccontin, sdccontout, CSR_DEV_BUS_IN, CSR_DEV_BUS_OUT);
+module SD_Controller(
+    clk, reset, ss, start, tx_byte, sdc_wirq_en, sdc_rirq_en, srr8, srr32, next_read_address,
+    next_write_address, cs_en, clk_on, clk_cnt, rx_byte, busy, done, card_busy, sd_read_interrupt,
+    sd_write_interrupt, SDC_DEV, DEV_SDC, MAR_DEV, SAR_SDC, sdccontin, sdccontout, CSR_DEV_BUS_IN,
+    CSR_DEV_BUS_OUT
+);
 
-    input clk, busy, done, reset, sdc_wirq_en, sdc_rirq_en, sd_read_interrupt, sd_write_interrupt, srr8, srr32;
+    input clk, busy, done, reset, sdc_wirq_en, sdc_rirq_en, sd_read_interrupt, sd_write_interrupt,
+        srr8, srr32;
     input [7:0] rx_byte, MAR_DEV, sdccontout;
     input [31:0] SAR_SDC, DEV_SDC, CSR_DEV_BUS_IN, CSR_DEV_BUS_OUT;
     output reg start, cs_en, ss, clk_on, card_busy, next_read_address, next_write_address;
@@ -26,31 +32,31 @@ module SD_Controller(clk, reset, ss, start, tx_byte, sdc_wirq_en, sdc_rirq_en, s
 
     initial
     begin
-        start       = 0;
-        sdrs        = 0;
-        sdws        = 0;
-        sdrd        = 0;
-        sdwd        = 0;
-        cs_en       = 1;
-        clk_on      = 1;
-        tx_byte     = 0;
-        clk_cnt     = 199;
-        init_state  = 0;
-        intra_state = 0;
-        write_state = 0;
-        read_state  = 0;
-        ready_state = 0;
+        start         = 0;
+        sdrs          = 0;
+        sdws          = 0;
+        sdrd          = 0;
+        sdwd          = 0;
+        cs_en         = 1;
+        clk_on        = 1;
+        tx_byte       = 0;
+        clk_cnt       = 199;
+        init_state    = 0;
+        intra_state   = 0;
+        write_state   = 0;
+        read_state    = 0;
+        ready_state   = 0;
         card_on_state = 0;
-        cnt         = 0;
-        rx_byte_reg = 0;
-        CMD_0       = 48'h400000000095;
-        CMD_8       = 48'h48000001AA87;
-        CMD_55      = 48'h770000000065;
-        ACMD_41     = 48'h694000000077;
-        CMD_58      = 48'h7A00000000FD;
-        rst_reg     = 0;
-        start_level = 0;
-        ss          = 0;
+        cnt           = 0;
+        rx_byte_reg   = 0;
+        CMD_0         = 48'h400000000095;
+        CMD_8         = 48'h48000001AA87;
+        CMD_55        = 48'h770000000065;
+        ACMD_41       = 48'h694000000077;
+        CMD_58        = 48'h7A00000000FD;
+        rst_reg       = 0;
+        start_level   = 0;
+        ss            = 0;
     end
 
     always @*
@@ -75,36 +81,35 @@ module SD_Controller(clk, reset, ss, start, tx_byte, sdc_wirq_en, sdc_rirq_en, s
         //     ss <= 0;
         // end
     end
-    
+
     assign write_address = SAR_SDC;
     assign read_address = SAR_SDC;
 
-always @*
-if (CSR_DEV_BUS_IN == 1 && CSR_DEV_BUS_OUT == 3)
-begin
-	sdws = sdccontout[0];
-end
+    always @*
+        if (CSR_DEV_BUS_IN == 1 && CSR_DEV_BUS_OUT == 3)
+        begin
+            sdws = sdccontout[0];
+        end
 
-always @*
-if (CSR_DEV_BUS_IN == 3 && CSR_DEV_BUS_OUT == 1)
-begin
-	sdrs = sdccontout[0];
-end
+    always @*
+        if (CSR_DEV_BUS_IN == 3 && CSR_DEV_BUS_OUT == 1)
+        begin
+            sdrs = sdccontout[0];
+        end
 
-always @*
-begin
-    if (CSR_DEV_BUS_IN == 1 && CSR_DEV_BUS_OUT == 3)
+    always @*
     begin
-	   sdccontin[0] = address_progression;
-	   sdccontin[1] = sdwd;
+        if (CSR_DEV_BUS_IN == 1 && CSR_DEV_BUS_OUT == 3)
+        begin
+            sdccontin[0] = address_progression;
+            sdccontin[1] = sdwd;
+        end
+        else if (CSR_DEV_BUS_IN == 3 && CSR_DEV_BUS_OUT == 1)
+        begin
+            sdccontin[0] = address_progression;
+            sdccontin[1] = sdrd;
+        end
     end
-    else if (CSR_DEV_BUS_IN == 3 && CSR_DEV_BUS_OUT == 1)
-    begin
-	   sdccontin[0] = address_progression;
-	   sdccontin[1] = sdrd;
-    end
-end
-
 
     always @(posedge clk)
     begin
@@ -543,10 +548,9 @@ end
             end
         end
 
-
         if (ready_state)
         begin
-        
+
             if (write_state == 0)
             begin
                 if (sdws)
@@ -683,7 +687,7 @@ end
                 begin
                     start       <= 0;
                     intra_state <= 6;
-                    cnt <= 0;
+                    cnt         <= 0;
                 end
                 else if (intra_state == 6 && (done || cnt > 0))
                 begin
@@ -692,15 +696,15 @@ end
                 end
                 else if (intra_state == 7)
                 begin
-                    address_progression   <= 1;
-                    start       <= 1;
-                    intra_state <= 8;
+                    address_progression <= 1;
+                    start               <= 1;
+                    intra_state         <= 8;
                 end
                 else if (intra_state == 8)
                 begin
-                    address_progression   <= 0;
-                    start       <= 0;
-                    intra_state <= 9;
+                    address_progression <= 0;
+                    start               <= 0;
+                    intra_state         <= 9;
                 end
                 else if (intra_state == 9 && done)
                 begin
@@ -813,15 +817,14 @@ end
                 end
             end
 
-
             if (read_state == 0)
             begin
-                sdrd <= 0;
+                sdrd              <= 0;
                 next_read_address <= 0;
                 if (sdrs)
                 begin
-                    cs_en       <= 0;
-                    read_state  <= 1;
+                    cs_en      <= 0;
+                    read_state <= 1;
                 end
             end
             else if (read_state == 1)
@@ -963,8 +966,8 @@ end
                 end
                 else if (intra_state == 1)
                 begin
-                    start       <= 1;
-                    intra_state <= 2;
+                    start               <= 1;
+                    intra_state         <= 2;
                     address_progression <= 0;
                 end
                 else if (intra_state == 2)
@@ -974,7 +977,7 @@ end
                 end
                 else if (intra_state == 3 && done)
                 begin
-                    SDC_DEV <= rx_byte;
+                    SDC_DEV     <= rx_byte;
                     intra_state <= 4;
                 end
                 else if (intra_state == 4)
@@ -982,22 +985,22 @@ end
                     if (cnt < 511)
                     begin
                         address_progression <= 1;
-                        cnt         <= cnt + 1;
-                        intra_state <= 1;
+                        cnt                 <= cnt + 1;
+                        intra_state         <= 1;
                     end
                     else
                     begin
                         address_progression <= 1;
-                        intra_state <= 5;
-                        cnt         <= 0;
+                        intra_state         <= 5;
+                        cnt                 <= 0;
                     end
                 end
                 else if (intra_state == 5)
                 begin
                     address_progression <= 0;
-                    tx_byte     <= 8'hFF;
-                    cnt         <= 0;
-                    intra_state <= 6;
+                    tx_byte             <= 8'hFF;
+                    cnt                 <= 0;
+                    intra_state         <= 6;
                 end
                 else if (intra_state == 6)
                 begin
@@ -1031,10 +1034,10 @@ end
                 end
                 else if (intra_state == 12 && done)
                 begin
-                    read_state <= 0;
+                    read_state  <= 0;
                     intra_state <= 0;
-                    cs_en <= 1;
-                    sdrd <= 1;
+                    cs_en       <= 1;
+                    sdrd        <= 1;
                 end
             end
         end
@@ -1043,7 +1046,9 @@ end
 endmodule
 
 
-module SPI_Engine(clk, start, tx_byte, cs_en, clk_on, clk_cnt, miso, rx_byte, busy, done, cs, sclk, mosi);
+module SPI_Engine(
+    clk, start, tx_byte, cs_en, clk_on, clk_cnt, miso, rx_byte, busy, done, cs, sclk, mosi
+);
 
     input clk, start, miso, cs_en, clk_on;
     input [7:0] tx_byte;
@@ -1073,7 +1078,6 @@ module SPI_Engine(clk, start, tx_byte, cs_en, clk_on, clk_cnt, miso, rx_byte, bu
 
     assign cs = cs_en;
 
-
     // CLOCK DIVIDER
 
     always @(posedge clk)
@@ -1096,15 +1100,14 @@ module SPI_Engine(clk, start, tx_byte, cs_en, clk_on, clk_cnt, miso, rx_byte, bu
         end
         else
         begin
-             clk_div   <= 0;
-             sclk_rise <= 0;
-             sclk_fall <= 0;
+            clk_div   <= 0;
+            sclk_rise <= 0;
+            sclk_fall <= 0;
         end
     end
 
     assign busy = (txfer_state != 0);
     assign done = (txfer_state == 3);
-
 
     // TRANSFER BYTES
 
